@@ -578,7 +578,7 @@
 						"containers": [
 							{
 								"name": "((application.name))",
-								"image": "humana/rc((application.name)):((application.version))",
+								"image": "humana/rc/((application.name)):((application.version))",
 								"command": [
 									"/bin/sh",
 									"((application.job.dir))/bin/init-db.sh"
