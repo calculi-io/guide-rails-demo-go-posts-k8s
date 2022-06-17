@@ -1,0 +1,667 @@
+{
+	"metadata": {
+		"version": 2
+	},
+	"application": {
+		"name": "grposts",
+		"language": "GOLANG",
+		"artifact_store": {
+			"repositories": null
+		}
+	},
+	"pipeline": {
+		"segments": [
+			{
+				"name": "Build",
+				"segment_type": "build",
+				"publish_attributes": {
+					"publish": true,
+					"docker_images": [
+						{
+							"repository": "((application.name))",
+							"tags": [
+								"((application.version))"
+							],
+							"context": "."
+						}
+					]
+				},
+				"exit_actions": {},
+				"properties": [
+					{
+						"name": "gopath",
+						"value": "${SEGMENT_BASE_DIR}/cache/go",
+						"description": "GOPATH is set to ${SEGMENT_BASE_DIR}/cache/go by default, when caching is enabled. Caches are maintained on the worker where your build gets allocated. For a new worker assigned to the build, the cache will be re-created"
+					}
+				],
+				"deployment_strategy": {},
+				"application_init": {},
+				"packages": [
+					{
+						"name": "((application.name))",
+						"downloads": [],
+						"files": [
+							"dist/*"
+						]
+					},
+					{
+						"name": "mysql",
+						"downloads": [],
+						"type": 2,
+						"helm_package": {
+							"pkg_source": 3,
+							"chart_name": "mysql",
+							"chart_version": "8.8.32",
+							"repository_url": "https://charts.bitnami.com/bitnami"
+						}
+					},
+					{
+						"name": "integration",
+						"downloads": [],
+						"files": [
+							"test/integration/((application.name))-integration.test"
+						]
+					},
+					{
+						"name": "instrumented",
+						"downloads": [],
+						"files": [
+							"((application.name))-instrumented"
+						],
+						"type": 1
+					},
+					{
+						"name": "go-tools",
+						"downloads": [],
+						"files": [
+							"gocov*",
+							"go-junit-report"
+						],
+						"type": 1
+					}
+				],
+				"instance_tags": [
+					{
+						"name": "application.name",
+						"value": "((application.name))"
+					}
+				],
+				"cache_info": {
+					"paths": [
+						"((gopath))"
+					]
+				},
+				"tasks": [
+					{
+						"name": "posts",
+						"steps": [
+							{
+								"name": "Get Dependencies",
+								"definition": "Get Dependencies",
+								"command": "go get -t -d ./...\n",
+								"properties": null
+							},
+							{
+								"name": "Unit Tests",
+								"definition": "Unit Tests",
+								"command": "set -o pipefail\nginkgo -cover -r -v -skip-package=pb,test,mock,proto | tee ginkgo.output",
+								"properties": null
+							},
+							{
+								"name": "Convert coverage",
+								"definition": "Convert coverage",
+								"command": "cat ginkgo.output 2\u003e\u00261 | go-junit-report \u003e test.xml\ngocov convert coverprofile.out | gocov-xml \u003e coverage.xml",
+								"properties": null
+							},
+							{
+								"name": "GetTools",
+								"definition": "GetTools",
+								"command": "go install github.com/axw/gocov/gocov@latest\ngo install github.com/AlekSi/gocov-xml@latest\ngo install github.com/jstemmer/go-junit-report@latest\ncp ${GOPATH}/bin/gocov* ${GOPATH}/bin/go-junit-report .",
+								"properties": null
+							},
+							{
+								"name": "Build",
+								"definition": "Build",
+								"command": "CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -tags netgo -ldflags '-w -extldflags \"-static\"' -o dist/((application.name))",
+								"properties": null
+							},
+							{
+								"name": "Build Integration Test",
+								"definition": "Build Integration Test",
+								"command": "cd test/integration\n\nCGO_ENABLED=0 GOOS=linux GOARCH=amd64 go test -a -tags netgo -ldflags '-w -extldflags \"-static\"' -c -coverpkg=all -covermode=count -o ((application.name))-integration.test",
+								"properties": []
+							},
+							{
+								"name": "Build Instrumented",
+								"definition": "Build Instrumented",
+								"command": "CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go test -a -tags netgo -ldflags '-w -extldflags \"-static\"' -c -coverpkg=all -covermode=count -o ((application.name))-instrumented",
+								"properties": null
+							}
+						],
+						"docker_options": {}
+					}
+				]
+			},
+			{
+				"name": "Integration",
+				"segment_type": "integration",
+				"run_after": [
+					"Build"
+				],
+				"exit_actions": {},
+				"properties": [
+					{
+						"name": "auth.username",
+						"value": "((db_user))",
+						"type": "string"
+					},
+					{
+						"name": "auth.password",
+						"value": "((db_user_password))",
+						"type": "string"
+					},
+					{
+						"name": "auth.database",
+						"value": "go_mysql_crud",
+						"type": "string"
+					},
+					{
+						"name": "db.host",
+						"value": "db-((application.name))-int-((application.branch)).query.consul",
+						"type": "string"
+					},
+					{
+						"name": "db.pass",
+						"value": "((auth.password))",
+						"type": "string"
+					},
+					{
+						"name": "db.port",
+						"value": "3306",
+						"type": "string"
+					},
+					{
+						"name": "db.name",
+						"value": "((auth.database))",
+						"type": "string"
+					},
+					{
+						"name": "persistence.enabled",
+						"value": false,
+						"type": "boolean"
+					},
+					{
+						"name": "gr.helm.wait.timeout",
+						"value": "4m",
+						"type": "string"
+					},
+					{
+						"name": "auth.rootPassword",
+						"value": "((db_root_password))",
+						"type": "string"
+					},
+					{
+						"name": "consul.servicename",
+						"value": "((application.name))-int-((application.branch))",
+						"type": "string"
+					},
+					{
+						"name": "gr.dns.config.nameservers",
+						"value": "((consul.joinservers))",
+						"type": "string"
+					},
+					{
+						"name": "gr.dns.policy",
+						"value": "None",
+						"type": "string"
+					},
+					{
+						"name": "server.port",
+						"value": "8005",
+						"type": "string"
+					},
+					{
+						"name": "server.host",
+						"value": "((consul.servicename)).query.consul",
+						"type": "string"
+					}
+				],
+				"deployment_strategy": {
+					"canaries": 1,
+					"max_in_flight": 1,
+					"canary_watch_time": "5000-30000",
+					"update_watch_time": "5000-30000",
+					"serial": false
+				},
+				"application_init": {},
+				"package_dependencies": [
+					"((application.name))",
+					"instrumented",
+					"go-tools",
+					"integration"
+				],
+				"instance_tags": [
+					{
+						"name": "application.name",
+						"value": "((application.name))"
+					}
+				],
+				"tasks": [
+					{
+						"name": "IntegrationTest",
+						"steps": [
+							{
+								"name": "execute tests",
+								"definition": "execute tests",
+								"command": "bin/run-integration-test.sh",
+								"properties": null
+							}
+						],
+						"docker_options": {}
+					}
+				],
+				"k8s_instance_groups": [
+					{
+						"tool_config_alias_id": "2c99a7d3-76d8-40be-4d71-f7811bc9a338",
+						"docker_registry_alias_id": "cc9edc73-f30b-4c9a-5d01-e03f7930a904",
+						"name": "db-((application.name))",
+						"cluster_name": "",
+						"namespace": "((application.name))-((application.branch))",
+						"replicas": 1,
+						"containers": [
+							{
+								"name": "((application.name))",
+								"image": "guide-rails/((application.name)):((application.version))",
+								"ports": [
+									{
+										"name": "app",
+										"hostPort": 8005,
+										"containerPort": 8005,
+										"protocol": "TCP"
+									}
+								],
+								"resources": {},
+								"imagePullPolicy": "Always"
+							}
+						],
+						"ingress": {
+							"metadata": {
+								"creationTimestamp": null
+							},
+							"spec": {
+								"rules": [
+									{
+										"http": {
+											"paths": [
+												{
+													"path": "/",
+													"backend": {
+														"servicePort": 0
+													}
+												}
+											]
+										}
+									}
+								]
+							},
+							"status": {
+								"loadBalancer": {}
+							}
+						},
+						"load_balancing_type": 2,
+						"service_name": "((application.name))-((application.branch))",
+						"type": "Deployment",
+						"deploy_application": false,
+						"helm_packages": [
+							{
+								"name": "mysql",
+								"type": 2,
+								"helmPackages": [
+									{
+										"pkg_source": 3,
+										"chart_name": "mysql",
+										"chart_version": "8.8.32",
+										"repository_url": "https://charts.bitnami.com/bitnami",
+										"release_name": "mysql-go-mysql-crud-int-((application.branch))"
+									}
+								]
+							}
+						],
+						"properties": [
+							{
+								"name": "primary.service.annotations",
+								"value": "consul.hashicorp.com/service-name: db-((application.name))-int-((application.branch))"
+							}
+						]
+					},
+					{
+						"tool_config_alias_id": "2c99a7d3-76d8-40be-4d71-f7811bc9a338",
+						"docker_registry_alias_id": "cc9edc73-f30b-4c9a-5d01-e03f7930a904",
+						"name": "((application.name))",
+						"cluster_name": "",
+						"namespace": "((application.name))-((application.branch))",
+						"replicas": 1,
+						"containers": [
+							{
+								"name": "((application.name))",
+								"image": "guide-rails/((application.name)):((application.version))",
+								"command": [
+									"/bin/sh",
+									"((application.job.dir))/bin/init-db.sh"
+								],
+								"ports": [
+									{
+										"name": "app",
+										"hostPort": 8005,
+										"containerPort": 8005,
+										"protocol": "TCP"
+									}
+								],
+								"resources": {},
+								"imagePullPolicy": "Always"
+							}
+						],
+						"ingress": {
+							"metadata": {
+								"creationTimestamp": null
+							},
+							"spec": {
+								"rules": [
+									{
+										"host": "((application.name))-int.guide-rails.io",
+										"http": {
+											"paths": [
+												{
+													"path": "/posts",
+													"backend": {
+														"servicePort": 0
+													}
+												}
+											]
+										}
+									}
+								]
+							},
+							"status": {
+								"loadBalancer": {}
+							}
+						},
+						"load_balancing_type": 2,
+						"service_name": "((application.name))-((application.branch))",
+						"alb_ingress_controller_annotations": {
+							"alb.ingress.kubernetes.io/certificate-arn": "arn:aws:iam::818130157321:server-certificate/guide-rails-wildcard-20220726",
+							"alb.ingress.kubernetes.io/healthcheck-path": "/",
+							"alb.ingress.kubernetes.io/healthcheck-port": "traffic-port",
+							"alb.ingress.kubernetes.io/listen-ports": "[{\"HTTP\": 80}, {\"HTTPS\":443}]",
+							"alb.ingress.kubernetes.io/scheme": "internet-facing",
+							"alb.ingress.kubernetes.io/ssl-redirect": "443",
+							"alb.ingress.kubernetes.io/subnets": "subnet-07b5638c601772ae6, subnet-0e2334d4d4099bfcd"
+						},
+						"type": "Deployment",
+						"deploy_application": true
+					}
+				],
+				"deployment_target": 2
+			},
+			{
+				"name": "Isolation",
+				"segment_type": "isolation",
+				"persistent": true,
+				"run_after": [
+					"Build"
+				],
+				"exit_actions": {},
+				"properties": [
+					{
+						"name": "auth.username",
+						"value": "((db_user))",
+						"type": "string"
+					},
+					{
+						"name": "auth.password",
+						"value": "((db_user_password))",
+						"type": "string"
+					},
+					{
+						"name": "auth.database",
+						"value": "go_mysql_crud",
+						"type": "string"
+					},
+					{
+						"name": "db.host",
+						"value": "mysql-go-mysql-crud-iso-main.((application.name))-((application.branch)).svc.cluster.local",
+						"type": "string"
+					},
+					{
+						"name": "db.pass",
+						"value": "((auth.password))",
+						"type": "string"
+					},
+					{
+						"name": "db.port",
+						"value": "3306",
+						"type": "string"
+					},
+					{
+						"name": "db.name",
+						"value": "((auth.database))",
+						"type": "string"
+					},
+					{
+						"name": "persistence.enabled",
+						"value": false,
+						"type": "boolean"
+					},
+					{
+						"name": "gr.helm.wait.timeout",
+						"value": "4m",
+						"type": "string"
+					},
+					{
+						"name": "auth.rootPassword",
+						"value": "((db_root_password))",
+						"type": "string"
+					},
+					{
+						"name": "server.host",
+						"value": "((application.name))-iso.guide-rails.io",
+						"type": "string"
+					}
+				],
+				"deployment_strategy": {
+					"canaries": 1,
+					"max_in_flight": 1,
+					"canary_watch_time": "5000-30000",
+					"update_watch_time": "5000-30000",
+					"serial": false
+				},
+				"application_init": {},
+				"package_dependencies": [
+					"((application.name))",
+					"integration"
+				],
+				"instance_tags": [
+					{
+						"name": "application.name",
+						"value": "((application.name))"
+					}
+				],
+				"tasks": [
+					{
+						"name": "isolation",
+						"steps": [
+							{
+								"name": "run tests",
+								"definition": "run tests",
+								"command": "bin/run-integration-test.sh",
+								"properties": null
+							}
+						],
+						"docker_options": {}
+					}
+				],
+				"k8s_instance_groups": [
+					{
+						"tool_config_alias_id": "2c99a7d3-76d8-40be-4d71-f7811bc9a338",
+						"docker_registry_alias_id": "cc9edc73-f30b-4c9a-5d01-e03f7930a904",
+						"name": "db-((application.name))",
+						"cluster_name": "",
+						"namespace": "((application.name))-((application.branch))",
+						"replicas": 1,
+						"containers": [
+							{
+								"name": "((application.name))",
+								"image": "guide-rails/((application.name)):((application.version))",
+								"ports": [
+									{
+										"name": "app",
+										"hostPort": 8005,
+										"containerPort": 8005,
+										"protocol": "TCP"
+									}
+								],
+								"resources": {},
+								"imagePullPolicy": "Always"
+							}
+						],
+						"ingress": {
+							"metadata": {
+								"creationTimestamp": null
+							},
+							"spec": {
+								"rules": [
+									{
+										"http": {
+											"paths": [
+												{
+													"path": "/",
+													"backend": {
+														"servicePort": 0
+													}
+												}
+											]
+										}
+									}
+								]
+							},
+							"status": {
+								"loadBalancer": {}
+							}
+						},
+						"load_balancing_type": 2,
+						"service_name": "((application.name))-((application.branch))",
+						"type": "Deployment",
+						"deploy_application": false,
+						"helm_packages": [
+							{
+								"name": "mysql",
+								"type": 2,
+								"helmPackages": [
+									{
+										"pkg_source": 3,
+										"chart_name": "mysql",
+										"chart_version": "8.8.32",
+										"repository_url": "https://charts.bitnami.com/bitnami",
+										"release_name": "mysql-go-mysql-crud-iso-main"
+									}
+								]
+							}
+						]
+					},
+					{
+						"tool_config_alias_id": "2c99a7d3-76d8-40be-4d71-f7811bc9a338",
+						"docker_registry_alias_id": "cc9edc73-f30b-4c9a-5d01-e03f7930a904",
+						"name": "((application.name))",
+						"cluster_name": "",
+						"namespace": "((application.name))-((application.branch))",
+						"replicas": 1,
+						"containers": [
+							{
+								"name": "((application.name))",
+								"image": "guide-rails/((application.name)):((application.version))",
+								"command": [
+									"/bin/sh",
+									"((application.job.dir))/bin/init-db.sh"
+								],
+								"ports": [
+									{
+										"name": "app",
+										"hostPort": 8005,
+										"containerPort": 8005,
+										"protocol": "TCP"
+									}
+								],
+								"resources": {},
+								"imagePullPolicy": "Always"
+							}
+						],
+						"ingress_enabled": true,
+						"ingress": {
+							"metadata": {
+								"creationTimestamp": null
+							},
+							"spec": {
+								"rules": [
+									{
+										"host": "((application.name))-iso.guide-rails.io",
+										"http": {
+											"paths": [
+												{
+													"path": "/posts",
+													"backend": {
+														"servicePort": 0
+													}
+												}
+											]
+										}
+									}
+								]
+							},
+							"status": {
+								"loadBalancer": {}
+							}
+						},
+						"load_balancing_type": 2,
+						"service_name": "((application.name))-((application.branch))",
+						"alb_ingress_controller_annotations": {
+							"alb.ingress.kubernetes.io/certificate-arn": "arn:aws:iam::818130157321:server-certificate/guide-rails-wildcard-20220726",
+							"alb.ingress.kubernetes.io/healthcheck-path": "/posts",
+							"alb.ingress.kubernetes.io/healthcheck-port": "traffic-port",
+							"alb.ingress.kubernetes.io/listen-ports": "[{\"HTTP\": 80}, {\"HTTPS\":443}]",
+							"alb.ingress.kubernetes.io/scheme": "internet-facing",
+							"alb.ingress.kubernetes.io/ssl-redirect": "443",
+							"alb.ingress.kubernetes.io/subnets": "subnet-07b5638c601772ae6, subnet-0e2334d4d4099bfcd"
+						},
+						"type": "Deployment",
+						"deploy_application": true
+					}
+				],
+				"deployment_target": 2
+			}
+		],
+		"exit_actions": {},
+		"default_properties": [],
+		"deployment_files": [
+			{
+				"source_path": "ci/bin/run-integration-test.sh",
+				"target_path": "bin/run-integration-test.sh"
+			},
+			{
+				"source_path": "ci/bin/start-instrumented.sh",
+				"target_path": "bin/start-instrumented.sh"
+			},
+			{
+				"source_path": "ci/bin/init-db.sh",
+				"target_path": "bin/init-db.sh"
+			},
+			{
+				"source_path": "ci/bin/initdb.sql",
+				"target_path": "bin/initdb.sql"
+			}
+		],
+		"application_init": {}
+	},
+	"organization": {
+		"orgname": "GR-Product"
+	}
+}
