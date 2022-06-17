@@ -262,8 +262,8 @@
 				],
 				"k8s_instance_groups": [
 					{
-						"tool_config_alias_id": "2c99a7d3-76d8-40be-4d71-f7811bc9a338",
-						"docker_registry_alias_id": "cc9edc73-f30b-4c9a-5d01-e03f7930a904",
+						"tool_config_alias_id": "f85f1139-cf97-45e7-7ac5-ea15292330bc",
+						"docker_registry_alias_id": "fead084b-01c1-4cb6-53b1-d139d85e3261",
 						"name": "db-((application.name))",
 						"cluster_name": "",
 						"namespace": "((application.name))-((application.branch))",
@@ -335,8 +335,8 @@
 						]
 					},
 					{
-						"tool_config_alias_id": "2c99a7d3-76d8-40be-4d71-f7811bc9a338",
-						"docker_registry_alias_id": "cc9edc73-f30b-4c9a-5d01-e03f7930a904",
+						"tool_config_alias_id": "f85f1139-cf97-45e7-7ac5-ea15292330bc",
+						"docker_registry_alias_id": "fead084b-01c1-4cb6-53b1-d139d85e3261",
 						"name": "((application.name))",
 						"cluster_name": "",
 						"namespace": "((application.name))-((application.branch))",
@@ -502,8 +502,8 @@
 				],
 				"k8s_instance_groups": [
 					{
-						"tool_config_alias_id": "2c99a7d3-76d8-40be-4d71-f7811bc9a338",
-						"docker_registry_alias_id": "cc9edc73-f30b-4c9a-5d01-e03f7930a904",
+						"tool_config_alias_id": "f85f1139-cf97-45e7-7ac5-ea15292330bc",
+						"docker_registry_alias_id": "fead084b-01c1-4cb6-53b1-d139d85e3261",
 						"name": "db-((application.name))",
 						"cluster_name": "",
 						"namespace": "((application.name))-((application.branch))",
@@ -569,8 +569,8 @@
 						]
 					},
 					{
-						"tool_config_alias_id": "2c99a7d3-76d8-40be-4d71-f7811bc9a338",
-						"docker_registry_alias_id": "cc9edc73-f30b-4c9a-5d01-e03f7930a904",
+						"tool_config_alias_id": "f85f1139-cf97-45e7-7ac5-ea15292330bc",
+						"docker_registry_alias_id": "fead084b-01c1-4cb6-53b1-d139d85e3261",
 						"name": "((application.name))",
 						"cluster_name": "",
 						"namespace": "((application.name))-((application.branch))",
@@ -628,9 +628,9 @@
 							"alb.ingress.kubernetes.io/healthcheck-path": "/posts",
 							"alb.ingress.kubernetes.io/healthcheck-port": "traffic-port",
 							"alb.ingress.kubernetes.io/listen-ports": "[{\"HTTP\": 80}, {\"HTTPS\":443}]",
-							"alb.ingress.kubernetes.io/scheme": "internet-facing",
+							"alb.ingress.kubernetes.io/scheme": "internal",
 							"alb.ingress.kubernetes.io/ssl-redirect": "443",
-							"alb.ingress.kubernetes.io/subnets": "subnet-07b5638c601772ae6, subnet-0e2334d4d4099bfcd"
+							"alb.ingress.kubernetes.io/subnets": "subnet-00b5b7449760120e4,subnet-07b0954bb3a6410c8,subnet-0847a7386e84051a8,subnet-05af39613bc5e3b92"
 						},
 						"type": "Deployment",
 						"deploy_application": true
