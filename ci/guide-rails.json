@@ -486,6 +486,7 @@
 						"value": "((application.name))"
 					}
 				],
+				"gated": true,
 				"tasks": [
 					{
 						"name": "isolation",
